@@ -5,8 +5,8 @@ package com.mzaimilzam.pokedex.models
  * linkedin : Muhammad Zaim Milzam
  */
 data class PokedexListEntry(
-    val pokedexName: String,
-    val imageUrl: String,
-    val number: Int,
+    var pokedexName: String,
+    var imageUrl: String,
+    var number: Int,
 
     )

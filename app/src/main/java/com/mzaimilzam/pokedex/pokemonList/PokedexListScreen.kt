@@ -1,40 +1,43 @@
-package com.mzaimilzam.pokedex.components
+package com.mzaimilzam.pokedex.pokemonList
 
+import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.AbsoluteRoundedCornerShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment.Companion.Center
 import androidx.compose.ui.Alignment.Companion.CenterHorizontally
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltNavGraphViewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import coil.request.ImageRequest
-import com.google.accompanist.coil.CoilImage
+import coil.annotation.ExperimentalCoilApi
+import coil.bitmap.BitmapPool
+import coil.compose.rememberImagePainter
+import coil.transform.Transformation
 import com.mzaimilzam.pokedex.R
 import com.mzaimilzam.pokedex.models.PokedexListEntry
-import com.mzaimilzam.pokedex.pokemonList.PokedexListViewModels
 
 /**
  * Created by Muhammad Zaim Milzam on 03/10/2021.
  * linkedin : Muhammad Zaim Milzam
  */
 
+@ExperimentalCoilApi
 @Composable
 fun PokedexListScreen(
     navController: NavController
@@ -60,6 +63,8 @@ fun PokedexListScreen(
             ) {
 
             }
+            Spacer(modifier = Modifier.height(16.dp))
+            PokemonList(navController = navController)
         }
     }
 }
@@ -106,17 +111,60 @@ fun SearchBar(
     }
 }
 
+@ExperimentalCoilApi
+@Composable
+fun PokemonList(
+    navController: NavController,
+    viewModel: PokedexListViewModels = hiltViewModel()
+) {
+    val pokemontList by remember { viewModel.pokemonList }
+    val endReach by remember { viewModel.endReached }
+    val loadError by remember { viewModel.loadError }
+    val isLoading by remember { viewModel.isLoading }
+
+    LazyColumn(contentPadding = PaddingValues(16.dp)) {
+        val itemCount = if (pokemontList.size % 2 == 0) {
+            pokemontList.size / 2
+        } else {
+            pokemontList.size / 2 + 1
+        }
+
+        items(itemCount) {
+            if (it >= itemCount - 1 && !endReach) {
+                viewModel.loadPokemonPaginated()
+            }
+            PokedexRow(rowIndex = it, entries = pokemontList, navController = navController)
+        }
+    }
+
+    Box(
+        contentAlignment = Center,
+        modifier = Modifier.fillMaxSize()
+    ) {
+        if (isLoading) {
+            CircularProgressIndicator(color = MaterialTheme.colors.primary)
+        }
+        if (loadError.isNotEmpty()) {
+            RetrySection(error = loadError) {
+                viewModel.loadPokemonPaginated()
+            }
+        }
+    }
+}
+
+@ExperimentalCoilApi
 @Composable
 fun PokedexEntry(
     entry: PokedexListEntry,
     navController: NavController,
     modifier: Modifier = Modifier,
-    viewModel: PokedexListViewModels = hiltNavGraphViewModel()
+    viewModel: PokedexListViewModels = hiltViewModel()
 ) {
-    val defaultDominantColor = MaterialTheme.colors.surface
-    var dominantCOlor by remember {
+    val defaultDominantColor = MaterialTheme.colors.surface.toArgb()
+    var dominantColor by rememberSaveable {
         mutableStateOf(defaultDominantColor)
     }
+    var isLoading by remember { mutableStateOf(true) }
 
     Box(
         contentAlignment = Center,
@@ -127,51 +175,151 @@ fun PokedexEntry(
             .background(
                 Brush.verticalGradient(
                     listOf(
-                        dominantCOlor,
-                        defaultDominantColor
+                        Color(dominantColor),
+                        Color(defaultDominantColor),
                     )
                 )
             )
             .clickable {
                 navController.navigate(
-                    "pokemon_detail_screen/${dominantCOlor.toArgb()}/${entry.pokedexName}"
+                    "pokemon_detail_screen/${dominantColor}/${entry.pokedexName}"
                 )
             }
-
     ) {
         Column {
-            CoilImage(
-                request = ImageRequest.Builder(LocalContext.current)
-                    .data(entry.imageUrl)
-                    .target {
-                        viewModel.calculateDominatColor(it) { color ->
-                            dominantCOlor = color
-
-                        }
-                    }
-                    .build(),
-                contentDescription = entry.pokedexName,
-                fadeIn = true,
+            Box(
                 modifier = Modifier
-                    .size(21.dp)
-                    .align(CenterHorizontally)
+                    .size(120.dp)
+                    .align(CenterHorizontally),
             ) {
-                CircularProgressIndicator(
-                    color = MaterialTheme.colors.primary,
-                    modifier = Modifier.scale(0.5f)
+                if (isLoading)
+                    CircularProgressIndicator(modifier = Modifier.align(Center))
+
+                Image(
+                    painter = rememberImagePainter(
+                        data = entry.imageUrl,
+                        builder = {
+                            crossfade(true)
+                            transformations(
+                                object : Transformation {
+                                    override fun key(): String {
+                                        return entry.imageUrl
+                                    }
+
+                                    override suspend fun transform(
+                                        pool: BitmapPool,
+                                        input: Bitmap,
+                                        size: coil.size.Size
+                                    ): Bitmap {
+                                        viewModel.calculateDominatColor(input) { color ->
+                                            dominantColor = color.toArgb()
+                                            isLoading = false
+                                        }
+                                        return input
+                                    }
+                                }
+                            )
+                        }
+                    ),
+                    contentDescription = entry.pokedexName,
+                    modifier = Modifier
+                        .size(120.dp)
                 )
             }
+
             Text(
                 text = entry.pokedexName,
                 fontSize = 20.sp,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
             )
         }
     }
-
 }
 
+//@ExperimentalCoilApi
+//@Composable
+//fun PokedexEntry(
+//    entry: PokedexListEntry,
+//    navController: NavController,
+//    modifier: Modifier = Modifier,
+//    viewModel: PokedexListViewModels = hiltNavGraphViewModel()
+//) {
+//    val defaultDominantColor = MaterialTheme.colors.surface
+//    var dominantColor by remember {
+//        mutableStateOf(defaultDominantColor)
+//    }
+//
+//    Box(
+//        contentAlignment = Center,
+//        modifier = modifier
+//            .shadow(5.dp, RoundedCornerShape(10.dp))
+//            .clip(RoundedCornerShape(10.dp))
+//            .aspectRatio(1f)
+//            .background(
+//                Brush.verticalGradient(
+//                    listOf(
+//                        dominantColor,
+//                        defaultDominantColor
+//                    )
+//                )
+//            )
+//            .clickable {
+//                navController.navigate(
+//                    "pokemon_detail_screen/${dominantColor.toArgb()}/${entry.pokedexName}"
+//                )
+//            }
+//    ) {
+//        Column {
+//            Image(
+//                painter = rememberCoilPainter(
+//                    request = ImageRequest.Builder(LocalContext.current)
+//                        .data(entry.imageUrl),
+////                        .target {
+////                            viewModel.calculateDominatColor(it) { color ->
+////                                dominantColor = color
+////                            }
+////                        },
+//                    fadeIn = true,
+//
+//                    ),
+//                contentDescription = entry.pokedexName,
+//                modifier = Modifier
+//                    .size(120.dp)
+//                    .align(CenterHorizontally)
+//            )
+////            CoilImage(
+////                request = ImageRequest.Builder(LocalContext.current)
+////                    .data(entry.imageUrl)
+////                    .target {
+////                        viewModel.calculateDominatColor(it) { color ->
+////                            dominantColor = color
+////                        }
+////                    }
+////                    .build(),
+////                contentDescription = entry.pokedexName,
+////                fadeIn = true,
+////                modifier = Modifier
+////                    .size(120.dp)
+////                    .align(CenterHorizontally)
+////            ) {
+////                CircularProgressIndicator(
+////                    color = MaterialTheme.colors.primary,
+////                    modifier = Modifier.scale(0.5f)
+////                )
+////            }
+//            Text(
+//                text = entry.pokedexName,
+//                fontSize = 20.sp,
+//                textAlign = TextAlign.Center,
+//                modifier = Modifier.fillMaxWidth()
+//            )
+//        }
+//    }
+//}
+
+@ExperimentalCoilApi
 @Composable
 fun PokedexRow(
     rowIndex: Int,
@@ -199,5 +347,22 @@ fun PokedexRow(
             }
         }
         Spacer(modifier = Modifier.height(8.dp))
+    }
+}
+
+@Composable
+fun RetrySection(
+    error: String,
+    onRetry: () -> Unit
+) {
+    Column {
+        Text(error, color = Color.Red, fontSize = 18.sp)
+        Spacer(modifier = Modifier.height(8.dp))
+        Button(
+            onClick = { onRetry() },
+            modifier = Modifier.align(CenterHorizontally)
+        ) {
+            Text(text = "Retry")
+        }
     }
 }
