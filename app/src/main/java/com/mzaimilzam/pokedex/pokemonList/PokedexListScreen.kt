@@ -130,7 +130,7 @@ fun PokemonList(
         }
 
         items(itemCount) {
-            if (it >= itemCount - 1 && !endReach) {
+            if (it >= itemCount - 1 && !endReach && !isLoading) {
                 viewModel.loadPokemonPaginated()
             }
             PokedexRow(rowIndex = it, entries = pokemontList, navController = navController)
