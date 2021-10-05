@@ -40,7 +40,9 @@ import com.mzaimilzam.pokedex.models.PokedexListEntry
 @ExperimentalCoilApi
 @Composable
 fun PokedexListScreen(
-    navController: NavController
+    navController: NavController,
+    viewModel: PokedexListViewModels = hiltViewModel()
+
 ) {
     Surface(
         color = MaterialTheme.colors.background,
@@ -49,7 +51,7 @@ fun PokedexListScreen(
         Column {
             Spacer(modifier = Modifier.height(20.dp))
             Image(
-                painter = painterResource(id = R.drawable.ic_launcher_background),
+                painter = painterResource(id = R.drawable.ic_international_pok_mon_logo),
                 contentDescription = "Pokemon",
                 modifier = Modifier
                     .fillMaxWidth()
@@ -61,7 +63,7 @@ fun PokedexListScreen(
                     .fillMaxWidth()
                     .padding(16.dp)
             ) {
-
+                viewModel.searchPokemonList(it)
             }
             Spacer(modifier = Modifier.height(16.dp))
             PokemonList(navController = navController)
@@ -78,10 +80,6 @@ fun SearchBar(
     var text by remember {
         mutableStateOf("")
     }
-    var isHintDisplayed by remember {
-        mutableStateOf(hint != "")
-    }
-
     Box(modifier = modifier) {
         TextField(
             modifier = Modifier
@@ -121,6 +119,7 @@ fun PokemonList(
     val endReach by remember { viewModel.endReached }
     val loadError by remember { viewModel.loadError }
     val isLoading by remember { viewModel.isLoading }
+    val isSearching by remember { viewModel.isSearching }
 
     LazyColumn(contentPadding = PaddingValues(16.dp)) {
         val itemCount = if (pokemontList.size % 2 == 0) {
@@ -130,7 +129,7 @@ fun PokemonList(
         }
 
         items(itemCount) {
-            if (it >= itemCount - 1 && !endReach && !isLoading) {
+            if (it >= itemCount - 1 && !endReach && !isLoading && !isSearching) {
                 viewModel.loadPokemonPaginated()
             }
             PokedexRow(rowIndex = it, entries = pokemontList, navController = navController)
@@ -237,87 +236,6 @@ fun PokedexEntry(
         }
     }
 }
-
-//@ExperimentalCoilApi
-//@Composable
-//fun PokedexEntry(
-//    entry: PokedexListEntry,
-//    navController: NavController,
-//    modifier: Modifier = Modifier,
-//    viewModel: PokedexListViewModels = hiltNavGraphViewModel()
-//) {
-//    val defaultDominantColor = MaterialTheme.colors.surface
-//    var dominantColor by remember {
-//        mutableStateOf(defaultDominantColor)
-//    }
-//
-//    Box(
-//        contentAlignment = Center,
-//        modifier = modifier
-//            .shadow(5.dp, RoundedCornerShape(10.dp))
-//            .clip(RoundedCornerShape(10.dp))
-//            .aspectRatio(1f)
-//            .background(
-//                Brush.verticalGradient(
-//                    listOf(
-//                        dominantColor,
-//                        defaultDominantColor
-//                    )
-//                )
-//            )
-//            .clickable {
-//                navController.navigate(
-//                    "pokemon_detail_screen/${dominantColor.toArgb()}/${entry.pokedexName}"
-//                )
-//            }
-//    ) {
-//        Column {
-//            Image(
-//                painter = rememberCoilPainter(
-//                    request = ImageRequest.Builder(LocalContext.current)
-//                        .data(entry.imageUrl),
-////                        .target {
-////                            viewModel.calculateDominatColor(it) { color ->
-////                                dominantColor = color
-////                            }
-////                        },
-//                    fadeIn = true,
-//
-//                    ),
-//                contentDescription = entry.pokedexName,
-//                modifier = Modifier
-//                    .size(120.dp)
-//                    .align(CenterHorizontally)
-//            )
-////            CoilImage(
-////                request = ImageRequest.Builder(LocalContext.current)
-////                    .data(entry.imageUrl)
-////                    .target {
-////                        viewModel.calculateDominatColor(it) { color ->
-////                            dominantColor = color
-////                        }
-////                    }
-////                    .build(),
-////                contentDescription = entry.pokedexName,
-////                fadeIn = true,
-////                modifier = Modifier
-////                    .size(120.dp)
-////                    .align(CenterHorizontally)
-////            ) {
-////                CircularProgressIndicator(
-////                    color = MaterialTheme.colors.primary,
-////                    modifier = Modifier.scale(0.5f)
-////                )
-////            }
-//            Text(
-//                text = entry.pokedexName,
-//                fontSize = 20.sp,
-//                textAlign = TextAlign.Center,
-//                modifier = Modifier.fillMaxWidth()
-//            )
-//        }
-//    }
-//}
 
 @ExperimentalCoilApi
 @Composable
